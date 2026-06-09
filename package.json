@@ -1,0 +1,26 @@
+{
+  "name": "html-share",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "pages:dev": "npm run build && wrangler pages dev dist --kv MY_KV",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "vite": "^5.4.19",
+    "vue": "^3.5.16",
+    "marked": "^15.0.12"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17",
+    "postcss": "^8.5.6",
+    "autoprefixer": "^10.4.21",
+    "vitest": "^2.1.9",
+    "wrangler": "^3.114.14"
+  }
+}
