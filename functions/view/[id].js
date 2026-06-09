@@ -96,6 +96,15 @@ function notFoundPage(siteId) {
 </html>`
 }
 
+function htmlHeaders() {
+  return {
+    'Content-Type': 'text/html;charset=UTF-8',
+    'X-Robots-Tag': 'noindex, nofollow, noarchive',
+    'Referrer-Policy': 'no-referrer',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+  }
+}
+
 export async function onRequestGet(context) {
   const siteId = context.params.id
   const htmlCode = await context.env.MY_KV.get(siteId)
@@ -103,16 +112,12 @@ export async function onRequestGet(context) {
   if (!htmlCode) {
     return new Response(notFoundPage(siteId), {
       status: 404,
-      headers: {
-        'Content-Type': 'text/html;charset=UTF-8',
-      },
+      headers: htmlHeaders(),
     })
   }
 
   return new Response(htmlCode, {
-    headers: {
-      'Content-Type': 'text/html;charset=UTF-8',
-    },
+    headers: htmlHeaders(),
   })
 }
 

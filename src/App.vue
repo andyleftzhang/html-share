@@ -1,132 +1,35 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { marked } from 'marked'
+import { computed, onMounted, ref } from 'vue'
+import { buildPublishHtml, detectFileKind } from './filePublisher.js'
 
-const inputType = ref('html')
-const content = ref(`<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>我的分享页面</title>
-    <style>
-      body {
-        min-height: 100vh;
-        margin: 0;
-        display: grid;
-        place-items: center;
-        font-family: system-ui, sans-serif;
-        color: #0f172a;
-        background: #f8fafc;
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>Hello, HTML Share!</h1>
-      <p>把这段代码换成你的作品，然后生成分享链接。</p>
-    </main>
-  </body>
-</html>`)
+const fileInput = ref(null)
+const turnstileContainer = ref(null)
+const selectedFile = ref(null)
+const selectedFileKind = ref('')
+const fileContent = ref('')
 const generatedUrl = ref('')
 const errorMessage = ref('')
 const isLoading = ref(false)
 const copied = ref(false)
+const turnstileToken = ref('')
+const turnstileWidgetId = ref(null)
+const expirationDays = ref(7)
+const expirationOptions = [1, 3, 7]
+const maxFileSizeBytes = 200 * 1024
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 
-const lineNumbers = computed(() => {
-  const count = Math.max(content.value.split('\n').length, 12)
-  return Array.from({ length: count }, (_, index) => index + 1).join('\n')
+const fileKindLabel = computed(() => {
+  if (selectedFileKind.value === 'html') return 'HTML 文件'
+  if (selectedFileKind.value === 'markdown') return 'Markdown 文件'
+  return '未选择'
 })
 
-function markdownDocument(markdownHtml) {
-  return `<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Markdown 分享页面</title>
-    <style>
-      :root {
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: #172033;
-        background: #f8fafc;
-      }
+const fileSizeLabel = computed(() => {
+  if (!selectedFile.value) return '0 KB'
 
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        padding: clamp(24px, 6vw, 72px);
-        background:
-          radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 32rem),
-          #f8fafc;
-      }
-
-      article {
-        width: min(100%, 820px);
-        margin: 0 auto;
-        padding: clamp(26px, 5vw, 56px);
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        border-radius: 20px;
-        background: rgba(255, 255, 255, 0.9);
-        box-shadow: 0 22px 70px rgba(15, 23, 42, 0.10);
-      }
-
-      h1, h2, h3 {
-        color: #0f172a;
-        line-height: 1.16;
-      }
-
-      h1 {
-        margin: 0 0 24px;
-        font-size: clamp(34px, 6vw, 56px);
-      }
-
-      h2 {
-        margin-top: 40px;
-        font-size: 28px;
-      }
-
-      p, li {
-        color: #475569;
-        font-size: 18px;
-        line-height: 1.8;
-      }
-
-      a {
-        color: #059669;
-      }
-
-      pre {
-        overflow: auto;
-        padding: 18px;
-        border-radius: 14px;
-        color: #e2e8f0;
-        background: #0f172a;
-      }
-
-      code {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      }
-
-      :not(pre) > code {
-        padding: 2px 6px;
-        border-radius: 6px;
-        color: #047857;
-        background: #d1fae5;
-      }
-    </style>
-  </head>
-  <body>
-    <article>
-      ${markdownHtml}
-    </article>
-  </body>
-</html>`
-}
+  const sizeInKb = selectedFile.value.size / 1024
+  return `${sizeInKb >= 100 ? Math.round(sizeInKb) : sizeInKb.toFixed(1)} KB`
+})
 
 async function readJsonResponse(response) {
   const responseText = await response.text()
@@ -142,30 +45,138 @@ async function readJsonResponse(response) {
   }
 }
 
+function loadTurnstileScript() {
+  if (!turnstileSiteKey || window.turnstile) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve, reject) => {
+    const existingScript = document.querySelector('script[data-turnstile-script]')
+
+    if (existingScript) {
+      existingScript.addEventListener('load', resolve, { once: true })
+      existingScript.addEventListener('error', reject, { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+    script.async = true
+    script.defer = true
+    script.dataset.turnstileScript = 'true'
+    script.addEventListener('load', resolve, { once: true })
+    script.addEventListener('error', reject, { once: true })
+    document.head.appendChild(script)
+  })
+}
+
+async function renderTurnstile() {
+  if (!turnstileSiteKey || !turnstileContainer.value) {
+    return
+  }
+
+  try {
+    await loadTurnstileScript()
+    turnstileWidgetId.value = window.turnstile.render(turnstileContainer.value, {
+      sitekey: turnstileSiteKey,
+      callback(token) {
+        turnstileToken.value = token
+        errorMessage.value = ''
+      },
+      'expired-callback'() {
+        turnstileToken.value = ''
+      },
+      'error-callback'() {
+        turnstileToken.value = ''
+        errorMessage.value = '人机验证加载失败，请刷新页面后重试。'
+      },
+    })
+  } catch {
+    errorMessage.value = '人机验证加载失败，请检查网络后刷新页面。'
+  }
+}
+
+function resetTurnstile() {
+  turnstileToken.value = ''
+
+  if (turnstileSiteKey && window.turnstile && turnstileWidgetId.value !== null) {
+    window.turnstile.reset(turnstileWidgetId.value)
+  }
+}
+
+async function handleFileChange(event) {
+  const [file] = Array.from(event.target.files || [])
+
+  generatedUrl.value = ''
+  copied.value = false
+  errorMessage.value = ''
+
+  if (!file) {
+    selectedFile.value = null
+    selectedFileKind.value = ''
+    fileContent.value = ''
+    return
+  }
+
+  try {
+    const kind = detectFileKind(file.name)
+
+    if (file.size > maxFileSizeBytes) {
+      throw new Error('文件不能超过 200KB。')
+    }
+
+    const text = await file.text()
+
+    if (!text.trim()) {
+      throw new Error('文件内容不能为空。')
+    }
+
+    selectedFile.value = file
+    selectedFileKind.value = kind
+    fileContent.value = text
+  } catch (error) {
+    selectedFile.value = null
+    selectedFileKind.value = ''
+    fileContent.value = ''
+    errorMessage.value = error.message || '读取文件失败，请重新选择。'
+    event.target.value = ''
+  }
+}
+
+function chooseFile() {
+  fileInput.value?.click()
+}
+
 async function createShareLink() {
   errorMessage.value = ''
   generatedUrl.value = ''
   copied.value = false
 
-  if (!content.value.trim()) {
-    errorMessage.value = '请先粘贴 HTML 或 Markdown 内容。'
+  if (!fileContent.value.trim() || !selectedFileKind.value) {
+    errorMessage.value = '请先选择一个 HTML 或 Markdown 文件。'
+    return
+  }
+
+  if (turnstileSiteKey && !turnstileToken.value) {
+    errorMessage.value = '请先完成人机验证。'
     return
   }
 
   isLoading.value = true
 
   try {
-    const htmlCode =
-      inputType.value === 'markdown'
-        ? markdownDocument(await marked.parse(content.value))
-        : content.value
+    const htmlCode = await buildPublishHtml(fileContent.value, selectedFileKind.value)
 
     const response = await fetch('/api/upload', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ htmlCode }),
+      body: JSON.stringify({
+        htmlCode,
+        expirationDays: expirationDays.value,
+        turnstileToken: turnstileToken.value,
+      }),
     })
 
     const data = await readJsonResponse(response)
@@ -177,6 +188,7 @@ async function createShareLink() {
     generatedUrl.value = data.url
   } catch (error) {
     errorMessage.value = error.message || '生成链接失败，请稍后重试。'
+    resetTurnstile()
   } finally {
     isLoading.value = false
   }
@@ -191,6 +203,10 @@ async function copyLink() {
     copied.value = false
   }, 1800)
 }
+
+onMounted(() => {
+  renderTurnstile()
+})
 </script>
 
 <template>
@@ -207,7 +223,7 @@ async function copyLink() {
             ⚡️ 3秒一键网页托管
           </h1>
           <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-            粘贴纯 HTML 或 Markdown，一次点击生成 7 天有效的 Cloudflare Pages 分享页面。
+            上传 HTML 或 Markdown 文件，一次点击生成可分享的 Cloudflare Pages 临时页面。
           </p>
         </div>
         <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
@@ -218,20 +234,14 @@ async function copyLink() {
       <div class="grid flex-1 gap-6 py-8 lg:grid-cols-[1fr_360px]">
         <section class="rounded-lg border border-slate-200 bg-white shadow-soft">
           <div class="flex flex-col gap-4 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <label class="flex flex-col gap-2 text-sm font-medium text-slate-700">
-              输入类型
-              <select
-                v-model="inputType"
-                class="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-              >
-                <option value="html">纯 HTML 代码</option>
-                <option value="markdown">Markdown 文本</option>
-              </select>
-            </label>
+            <div>
+              <h2 class="text-lg font-semibold text-slate-950">上传网页文件</h2>
+              <p class="mt-1 text-sm text-slate-500">支持 .html、.htm、.md、.markdown 文件，最大 200KB</p>
+            </div>
 
             <button
               type="button"
-              :disabled="isLoading"
+              :disabled="isLoading || !selectedFile"
               class="inline-flex h-11 items-center justify-center rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-300 disabled:cursor-not-allowed disabled:bg-slate-400"
               @click="createShareLink"
             >
@@ -240,34 +250,74 @@ async function copyLink() {
             </button>
           </div>
 
-          <div class="grid min-h-[560px] grid-cols-[56px_1fr] overflow-hidden rounded-b-lg bg-slate-950">
-            <pre class="select-none overflow-hidden border-r border-white/10 bg-slate-900 px-4 py-5 text-right text-sm leading-6 text-slate-500">{{ lineNumbers }}</pre>
-            <textarea
-              v-model="content"
-              spellcheck="false"
-              class="min-h-[560px] resize-none bg-slate-950 px-5 py-5 font-mono text-sm leading-6 text-slate-100 caret-emerald-300 outline-none placeholder:text-slate-500"
-              placeholder="在这里粘贴你的 HTML 代码或 Markdown 文本..."
-            ></textarea>
+          <div class="p-5">
+            <input
+              ref="fileInput"
+              type="file"
+              class="sr-only"
+              accept=".html,.htm,.md,.markdown,text/html,text/markdown,text/plain"
+              @change="handleFileChange"
+            />
+
+            <button
+              type="button"
+              class="flex min-h-[220px] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center transition hover:border-emerald-400 hover:bg-emerald-50/60 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+              @click="chooseFile"
+            >
+              <span class="grid h-14 w-14 place-items-center rounded-lg bg-slate-950 text-2xl font-semibold text-white">
+                ↑
+              </span>
+              <span class="mt-5 text-xl font-semibold text-slate-950">
+                {{ selectedFile ? selectedFile.name : '选择 HTML 或 Markdown 文件' }}
+              </span>
+              <span class="mt-2 max-w-lg text-sm leading-6 text-slate-500">
+                {{ selectedFile ? `${fileKindLabel} · ${fileSizeLabel}` : '文件会在浏览器本地读取，Markdown 会先转换成完整 HTML，再上传到 KV。' }}
+              </span>
+            </button>
           </div>
         </section>
 
         <aside class="flex flex-col gap-4">
           <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
             <h2 class="text-lg font-semibold text-slate-950">分享设置</h2>
-            <dl class="mt-5 space-y-4 text-sm">
+            <div class="mt-5">
+              <label class="text-sm font-medium text-slate-600">有效期</label>
+              <div class="mt-3 grid grid-cols-5 gap-2">
+                <button
+                  v-for="days in expirationOptions"
+                  :key="days"
+                  type="button"
+                  class="h-10 rounded-lg border text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-emerald-100"
+                  :class="
+                    expirationDays === days
+                      ? 'border-emerald-600 bg-emerald-600 text-white'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
+                  "
+                  @click="expirationDays = days"
+                >
+                  {{ days }}天
+                </button>
+              </div>
+            </div>
+
+            <dl class="mt-5 space-y-4 border-t border-slate-200 pt-5 text-sm">
               <div class="flex items-center justify-between gap-4">
-                <dt class="text-slate-500">有效期</dt>
-                <dd class="font-medium text-slate-900">7 天</dd>
+                <dt class="text-slate-500">文件类型</dt>
+                <dd class="font-medium text-slate-900">{{ fileKindLabel }}</dd>
               </div>
               <div class="flex items-center justify-between gap-4">
-                <dt class="text-slate-500">渲染方式</dt>
-                <dd class="font-medium text-slate-900">浏览器直出 HTML</dd>
-              </div>
-              <div class="flex items-center justify-between gap-4">
-                <dt class="text-slate-500">上传接口</dt>
-                <dd class="font-mono text-xs font-medium text-slate-900">/api/upload</dd>
+                <dt class="text-slate-500">文件大小</dt>
+                <dd class="font-medium text-slate-900">{{ fileSizeLabel }}</dd>
               </div>
             </dl>
+          </div>
+
+          <div
+            v-if="turnstileSiteKey"
+            class="rounded-lg border border-slate-200 bg-white p-5 shadow-soft"
+          >
+            <h2 class="text-lg font-semibold text-slate-950">人机验证</h2>
+            <div ref="turnstileContainer" class="mt-4 min-h-[65px]"></div>
           </div>
 
           <div
