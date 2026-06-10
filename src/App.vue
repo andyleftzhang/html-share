@@ -12,6 +12,7 @@ const errorMessage = ref('')
 const isLoading = ref(false)
 const copied = ref(false)
 const showSuccessDialog = ref(false)
+const isDraggingFile = ref(false)
 const turnstileToken = ref('')
 const turnstileWidgetId = ref(null)
 const expirationDays = ref(7)
@@ -105,13 +106,15 @@ function resetTurnstile() {
   }
 }
 
-async function handleFileChange(event) {
-  const [file] = Array.from(event.target.files || [])
-
+function resetUploadResultState() {
   generatedUrl.value = ''
   copied.value = false
   showSuccessDialog.value = false
   errorMessage.value = ''
+}
+
+async function processSelectedFile(file) {
+  resetUploadResultState()
 
   if (!file) {
     selectedFile.value = null
@@ -143,6 +146,23 @@ async function handleFileChange(event) {
     errorMessage.value = error.message || 'Could not read this file. Please choose another one.'
     event.target.value = ''
   }
+}
+
+async function handleFileChange(event) {
+  const [file] = Array.from(event.target.files || [])
+
+  await processSelectedFile(file)
+
+  if (!selectedFile.value) {
+    event.target.value = ''
+  }
+}
+
+async function handleFileDrop(event) {
+  isDraggingFile.value = false
+  const [file] = Array.from(event.dataTransfer?.files || [])
+
+  await processSelectedFile(file)
 }
 
 function chooseFile() {
@@ -277,14 +297,23 @@ onUnmounted(() => {
 
             <button
               type="button"
-              class="flex min-h-[220px] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center transition hover:border-emerald-400 hover:bg-emerald-50/60 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+              class="flex min-h-[220px] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 text-center transition focus:outline-none focus:ring-4 focus:ring-emerald-100"
+              :class="
+                isDraggingFile
+                  ? 'border-emerald-500 bg-emerald-50 shadow-inner'
+                  : 'border-slate-300 bg-slate-50 hover:border-emerald-400 hover:bg-emerald-50/60'
+              "
+              @dragenter.prevent="isDraggingFile = true"
+              @dragover.prevent="isDraggingFile = true"
+              @dragleave.prevent="isDraggingFile = false"
+              @drop.prevent="handleFileDrop"
               @click="chooseFile"
             >
               <span class="grid h-14 w-14 place-items-center rounded-lg bg-slate-950 text-2xl font-semibold text-white">
                 ↑
               </span>
               <span class="mt-5 text-xl font-semibold text-slate-950">
-                {{ selectedFile ? selectedFile.name : 'Choose an HTML or Markdown file' }}
+                {{ selectedFile ? selectedFile.name : 'Choose or drop an HTML or Markdown file' }}
               </span>
               <span class="mt-2 max-w-lg text-sm leading-6 text-slate-500">
                 {{ selectedFile ? `${fileKindLabel} · ${fileSizeLabel}` : 'Your file is read locally in the browser. Markdown is converted to HTML before upload.' }}
