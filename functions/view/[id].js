@@ -11,11 +11,11 @@ function notFoundPage(siteId) {
   })
 
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>页面不存在或已过期</title>
+    <title>Page not found or expired</title>
     <style>
       :root {
         color-scheme: light;
@@ -88,8 +88,8 @@ function notFoundPage(siteId) {
   <body>
     <main>
       <div class="mark">404</div>
-      <h1>页面不存在或已过期</h1>
-      <p>这个分享页面可能已经超过 7 天有效期，或者链接 ID 输入有误。</p>
+      <h1>Page not found or expired</h1>
+      <p>This shared page may have expired, been removed, or the link ID may be incorrect.</p>
       ${escapedId ? `<code>ID: ${escapedId}</code>` : ''}
     </main>
   </body>

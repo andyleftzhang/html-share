@@ -11,7 +11,7 @@ describe('file publisher helpers', () => {
   })
 
   it('rejects unsupported file types', () => {
-    expect(() => detectFileKind('image.png')).toThrow('仅支持上传 HTML 或 Markdown 文件。')
+    expect(() => detectFileKind('image.png')).toThrow('Only HTML and Markdown files are supported.')
   })
 
   it('keeps html content as-is before publishing', async () => {

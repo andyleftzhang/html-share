@@ -31,7 +31,7 @@ describe('upload function', () => {
 
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({
-      error: '请先完成人机验证。',
+      error: 'Please complete human verification first.',
     })
   })
 
@@ -99,7 +99,7 @@ describe('upload function', () => {
 
       expect(response.status).toBe(403)
       expect(await response.json()).toEqual({
-        error: '人机验证失败，请重试。',
+        error: 'Human verification failed. Please try again.',
       })
     } finally {
       vi.stubGlobal('fetch', originalFetch)
@@ -159,7 +159,7 @@ describe('upload function', () => {
 
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({
-      error: '有效期只能选择 1、3 或 7 天。',
+      error: 'Expiration must be 1, 3, or 7 days.',
     })
   })
 
@@ -188,7 +188,7 @@ describe('upload function', () => {
 
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({
-      error: '内容包含高风险表单、凭证或脚本特征，无法发布。',
+      error: 'This file contains high-risk credential or script patterns and cannot be published.',
     })
   })
 
@@ -313,6 +313,6 @@ describe('view function', () => {
     })
 
     expect(response.status).toBe(404)
-    expect(await response.text()).toContain('页面不存在或已过期')
+    expect(await response.text()).toContain('Page not found or expired')
   })
 })

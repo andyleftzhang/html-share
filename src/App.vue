@@ -19,9 +19,9 @@ const maxFileSizeBytes = 200 * 1024
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 
 const fileKindLabel = computed(() => {
-  if (selectedFileKind.value === 'html') return 'HTML 文件'
-  if (selectedFileKind.value === 'markdown') return 'Markdown 文件'
-  return '未选择'
+  if (selectedFileKind.value === 'html') return 'HTML file'
+  if (selectedFileKind.value === 'markdown') return 'Markdown file'
+  return 'Not selected'
 })
 
 const fileSizeLabel = computed(() => {
@@ -41,7 +41,7 @@ async function readJsonResponse(response) {
   try {
     return JSON.parse(responseText)
   } catch {
-    throw new Error('当前环境没有返回 API JSON。请用 npm run pages:dev 启动 Cloudflare Pages Functions 后再生成链接。')
+    throw new Error('The current environment did not return API JSON. Run npm run pages:dev to test Cloudflare Pages Functions locally.')
   }
 }
 
@@ -88,11 +88,11 @@ async function renderTurnstile() {
       },
       'error-callback'() {
         turnstileToken.value = ''
-        errorMessage.value = '人机验证加载失败，请刷新页面后重试。'
+        errorMessage.value = 'Human verification failed to load. Refresh the page and try again.'
       },
     })
   } catch {
-    errorMessage.value = '人机验证加载失败，请检查网络后刷新页面。'
+    errorMessage.value = 'Human verification failed to load. Check your connection and refresh the page.'
   }
 }
 
@@ -122,13 +122,13 @@ async function handleFileChange(event) {
     const kind = detectFileKind(file.name)
 
     if (file.size > maxFileSizeBytes) {
-      throw new Error('文件不能超过 200KB。')
+      throw new Error('Files must be 200KB or less.')
     }
 
     const text = await file.text()
 
     if (!text.trim()) {
-      throw new Error('文件内容不能为空。')
+      throw new Error('File content cannot be empty.')
     }
 
     selectedFile.value = file
@@ -138,7 +138,7 @@ async function handleFileChange(event) {
     selectedFile.value = null
     selectedFileKind.value = ''
     fileContent.value = ''
-    errorMessage.value = error.message || '读取文件失败，请重新选择。'
+    errorMessage.value = error.message || 'Could not read this file. Please choose another one.'
     event.target.value = ''
   }
 }
@@ -153,12 +153,12 @@ async function createShareLink() {
   copied.value = false
 
   if (!fileContent.value.trim() || !selectedFileKind.value) {
-    errorMessage.value = '请先选择一个 HTML 或 Markdown 文件。'
+    errorMessage.value = 'Choose an HTML or Markdown file first.'
     return
   }
 
   if (turnstileSiteKey && !turnstileToken.value) {
-    errorMessage.value = '请先完成人机验证。'
+    errorMessage.value = 'Complete human verification first.'
     return
   }
 
@@ -182,12 +182,12 @@ async function createShareLink() {
     const data = await readJsonResponse(response)
 
     if (!response.ok) {
-      throw new Error(data.error || '生成链接失败，请稍后重试。')
+      throw new Error(data.error || 'Could not create a share link. Please try again.')
     }
 
     generatedUrl.value = data.url
   } catch (error) {
-    errorMessage.value = error.message || '生成链接失败，请稍后重试。'
+    errorMessage.value = error.message || 'Could not create a share link. Please try again.'
     resetTurnstile()
   } finally {
     isLoading.value = false
@@ -217,17 +217,14 @@ onMounted(() => {
     </div>
 
     <section class="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 py-8 sm:px-8 lg:px-10">
-      <header class="flex flex-col gap-3 border-b border-slate-200/80 pb-7 sm:flex-row sm:items-end sm:justify-between">
+      <header class="border-b border-slate-200/80 pb-7">
         <div>
           <h1 class="text-3xl font-semibold tracking-normal text-slate-950 sm:text-4xl">
-            ⚡️ 3秒一键网页托管
+            ⚡ Instant HTML Hosting
           </h1>
           <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-            上传 HTML 或 Markdown 文件，一次点击生成可分享的 Cloudflare Pages 临时页面。
+            Upload an HTML or Markdown file and publish a temporary share page in seconds.
           </p>
-        </div>
-        <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-          同源 API · KV 临时存储
         </div>
       </header>
 
@@ -235,8 +232,8 @@ onMounted(() => {
         <section class="rounded-lg border border-slate-200 bg-white shadow-soft">
           <div class="flex flex-col gap-4 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 class="text-lg font-semibold text-slate-950">上传网页文件</h2>
-              <p class="mt-1 text-sm text-slate-500">支持 .html、.htm、.md、.markdown 文件，最大 200KB</p>
+              <h2 class="text-lg font-semibold text-slate-950">Upload a web page</h2>
+              <p class="mt-1 text-sm text-slate-500">Supports .html, .htm, .md, and .markdown files up to 200KB</p>
             </div>
 
             <button
@@ -245,8 +242,8 @@ onMounted(() => {
               class="inline-flex h-11 items-center justify-center rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-300 disabled:cursor-not-allowed disabled:bg-slate-400"
               @click="createShareLink"
             >
-              <span v-if="isLoading">生成中...</span>
-              <span v-else>生成分享链接</span>
+              <span v-if="isLoading">Creating...</span>
+              <span v-else>Create share link</span>
             </button>
           </div>
 
@@ -268,10 +265,10 @@ onMounted(() => {
                 ↑
               </span>
               <span class="mt-5 text-xl font-semibold text-slate-950">
-                {{ selectedFile ? selectedFile.name : '选择 HTML 或 Markdown 文件' }}
+                {{ selectedFile ? selectedFile.name : 'Choose an HTML or Markdown file' }}
               </span>
               <span class="mt-2 max-w-lg text-sm leading-6 text-slate-500">
-                {{ selectedFile ? `${fileKindLabel} · ${fileSizeLabel}` : '文件会在浏览器本地读取，Markdown 会先转换成完整 HTML，再上传到 KV。' }}
+                {{ selectedFile ? `${fileKindLabel} · ${fileSizeLabel}` : 'Your file is read locally in the browser. Markdown is converted to HTML before upload.' }}
               </span>
             </button>
           </div>
@@ -279,9 +276,9 @@ onMounted(() => {
 
         <aside class="flex flex-col gap-4">
           <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
-            <h2 class="text-lg font-semibold text-slate-950">分享设置</h2>
+            <h2 class="text-lg font-semibold text-slate-950">Share settings</h2>
             <div class="mt-5">
-              <label class="text-sm font-medium text-slate-600">有效期</label>
+              <label class="text-sm font-medium text-slate-600">Expiration</label>
               <div class="mt-3 grid grid-cols-5 gap-2">
                 <button
                   v-for="days in expirationOptions"
@@ -295,18 +292,18 @@ onMounted(() => {
                   "
                   @click="expirationDays = days"
                 >
-                  {{ days }}天
+                  {{ days }}d
                 </button>
               </div>
             </div>
 
             <dl class="mt-5 space-y-4 border-t border-slate-200 pt-5 text-sm">
               <div class="flex items-center justify-between gap-4">
-                <dt class="text-slate-500">文件类型</dt>
+                <dt class="text-slate-500">File type</dt>
                 <dd class="font-medium text-slate-900">{{ fileKindLabel }}</dd>
               </div>
               <div class="flex items-center justify-between gap-4">
-                <dt class="text-slate-500">文件大小</dt>
+                <dt class="text-slate-500">File size</dt>
                 <dd class="font-medium text-slate-900">{{ fileSizeLabel }}</dd>
               </div>
             </dl>
@@ -316,7 +313,7 @@ onMounted(() => {
             v-if="turnstileSiteKey"
             class="rounded-lg border border-slate-200 bg-white p-5 shadow-soft"
           >
-            <h2 class="text-lg font-semibold text-slate-950">人机验证</h2>
+            <h2 class="text-lg font-semibold text-slate-950">Human verification</h2>
             <div ref="turnstileContainer" class="mt-4 min-h-[65px]"></div>
           </div>
 
@@ -336,8 +333,8 @@ onMounted(() => {
                 ✓
               </div>
               <div>
-                <p class="text-sm font-semibold text-emerald-800">生成成功</p>
-                <p class="text-xs text-emerald-700">你的网页已经可以访问。</p>
+                <p class="text-sm font-semibold text-emerald-800">Share link created</p>
+                <p class="text-xs text-emerald-700">Your page is ready to open.</p>
               </div>
             </div>
 
@@ -355,7 +352,7 @@ onMounted(() => {
               class="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
               @click="copyLink"
             >
-              {{ copied ? '已复制' : '一键复制链接' }}
+              {{ copied ? 'Copied' : 'Copy link' }}
             </button>
           </div>
         </aside>

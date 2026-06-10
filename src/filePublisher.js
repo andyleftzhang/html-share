@@ -11,7 +11,7 @@ export function detectFileKind(fileName) {
     return 'markdown'
   }
 
-  throw new Error('仅支持上传 HTML 或 Markdown 文件。')
+  throw new Error('Only HTML and Markdown files are supported.')
 }
 
 export function markdownDocument(markdownHtml) {
@@ -20,7 +20,7 @@ export function markdownDocument(markdownHtml) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Markdown 分享页面</title>
+    <title>Markdown Share Page</title>
     <style>
       :root {
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -113,5 +113,5 @@ export async function buildPublishHtml(content, kind) {
     return markdownDocument(await marked.parse(content))
   }
 
-  throw new Error('无法识别文件类型。')
+  throw new Error('Unsupported file type.')
 }

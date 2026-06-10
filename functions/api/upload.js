@@ -40,7 +40,7 @@ function resolveExpirationDays(value) {
   const days = Number(value)
 
   if (!Number.isInteger(days) || !ALLOWED_EXPIRATION_DAYS.has(days)) {
-    throw new Error('有效期只能选择 1、3 或 7 天。')
+    throw new Error('Expiration must be 1, 3, or 7 days.')
   }
 
   return days
@@ -93,7 +93,7 @@ async function enforceRateLimit(kv, request) {
   const dayCount = await incrementRateCounter(kv, dayKey)
 
   if (minuteCount > MAX_UPLOADS_PER_MINUTE || dayCount > MAX_UPLOADS_PER_DAY) {
-    throw new Error('上传过于频繁，请稍后再试。')
+    throw new Error('Too many uploads. Please try again later.')
   }
 }
 
@@ -107,7 +107,7 @@ async function createUniqueSiteId(kv) {
     }
   }
 
-  throw new Error('生成分享 ID 失败，请稍后重试。')
+  throw new Error('Could not create a share ID. Please try again.')
 }
 
 async function verifyTurnstileToken({ secret, token, ip }) {
@@ -143,21 +143,21 @@ export async function onRequestPost(context) {
   try {
     payload = await request.json()
   } catch {
-    return json({ error: '请求体必须是合法的 JSON。' }, { status: 400 })
+    return json({ error: 'Request body must be valid JSON.' }, { status: 400 })
   }
 
   const htmlCode = typeof payload?.htmlCode === 'string' ? payload.htmlCode.trim() : ''
 
   if (!htmlCode) {
-    return json({ error: 'HTML 内容不能为空。' }, { status: 400 })
+    return json({ error: 'HTML content cannot be empty.' }, { status: 400 })
   }
 
   if (byteLength(htmlCode) > MAX_HTML_BYTES) {
-    return json({ error: '文件内容不能超过 200KB。' }, { status: 413 })
+    return json({ error: 'File content must be 200KB or less.' }, { status: 413 })
   }
 
   if (hasSuspiciousContent(htmlCode)) {
-    return json({ error: '内容包含高风险表单、凭证或脚本特征，无法发布。' }, { status: 400 })
+    return json({ error: 'This file contains high-risk credential or script patterns and cannot be published.' }, { status: 400 })
   }
 
   let turnstileResult
@@ -168,15 +168,15 @@ export async function onRequestPost(context) {
       ip: getClientIp(request),
     })
   } catch {
-    return json({ error: '人机验证服务暂时不可用，请稍后再试。' }, { status: 503 })
+    return json({ error: 'Human verification is temporarily unavailable. Please try again later.' }, { status: 503 })
   }
 
   if (turnstileResult.missingToken) {
-    return json({ error: '请先完成人机验证。' }, { status: 400 })
+    return json({ error: 'Please complete human verification first.' }, { status: 400 })
   }
 
   if (!turnstileResult.success) {
-    return json({ error: '人机验证失败，请重试。' }, { status: 403 })
+    return json({ error: 'Human verification failed. Please try again.' }, { status: 403 })
   }
 
   let expirationDays
