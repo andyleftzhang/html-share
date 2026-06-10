@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { buildPublishHtml, detectFileKind } from './filePublisher.js'
 
 const fileInput = ref(null)
@@ -11,6 +11,7 @@ const generatedUrl = ref('')
 const errorMessage = ref('')
 const isLoading = ref(false)
 const copied = ref(false)
+const showSuccessDialog = ref(false)
 const turnstileToken = ref('')
 const turnstileWidgetId = ref(null)
 const expirationDays = ref(7)
@@ -109,6 +110,7 @@ async function handleFileChange(event) {
 
   generatedUrl.value = ''
   copied.value = false
+  showSuccessDialog.value = false
   errorMessage.value = ''
 
   if (!file) {
@@ -147,10 +149,21 @@ function chooseFile() {
   fileInput.value?.click()
 }
 
+function closeSuccessDialog() {
+  showSuccessDialog.value = false
+}
+
+function handleWindowKeydown(event) {
+  if (event.key === 'Escape') {
+    closeSuccessDialog()
+  }
+}
+
 async function createShareLink() {
   errorMessage.value = ''
   generatedUrl.value = ''
   copied.value = false
+  showSuccessDialog.value = false
 
   if (!fileContent.value.trim() || !selectedFileKind.value) {
     errorMessage.value = 'Choose an HTML or Markdown file first.'
@@ -186,6 +199,7 @@ async function createShareLink() {
     }
 
     generatedUrl.value = data.url
+    showSuccessDialog.value = true
   } catch (error) {
     errorMessage.value = error.message || 'Could not create a share link. Please try again.'
     resetTurnstile()
@@ -206,6 +220,11 @@ async function copyLink() {
 
 onMounted(() => {
   renderTurnstile()
+  window.addEventListener('keydown', handleWindowKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleWindowKeydown)
 })
 </script>
 
@@ -323,40 +342,67 @@ onMounted(() => {
           >
             {{ errorMessage }}
           </div>
-
-          <div
-            v-if="generatedUrl"
-            class="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-soft"
-          >
-            <div class="flex items-center gap-3">
-              <div class="grid h-10 w-10 place-items-center rounded-lg bg-emerald-600 text-lg font-bold text-white">
-                ✓
-              </div>
-              <div>
-                <p class="text-sm font-semibold text-emerald-800">Share link created</p>
-                <p class="text-xs text-emerald-700">Your page is ready to open.</p>
-              </div>
-            </div>
-
-            <a
-              :href="generatedUrl"
-              target="_blank"
-              rel="noreferrer"
-              class="mt-5 block break-all rounded-lg border border-emerald-200 bg-white p-4 font-mono text-sm leading-6 text-emerald-700 transition hover:border-emerald-300 hover:text-emerald-800"
-            >
-              {{ generatedUrl }}
-            </a>
-
-            <button
-              type="button"
-              class="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
-              @click="copyLink"
-            >
-              {{ copied ? 'Copied' : 'Copy link' }}
-            </button>
-          </div>
         </aside>
       </div>
     </section>
+
+    <div
+      v-if="showSuccessDialog"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="success-dialog-title"
+      @click.self="closeSuccessDialog"
+    >
+      <div class="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="grid h-11 w-11 place-items-center rounded-lg bg-emerald-600 text-lg font-bold text-white">
+              ✓
+            </div>
+            <div>
+              <h2 id="success-dialog-title" class="text-lg font-semibold text-slate-950">Share link created</h2>
+              <p class="mt-1 text-sm text-slate-500">Copy it now and paste it anywhere.</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="grid h-9 w-9 place-items-center rounded-lg text-xl leading-none text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-slate-200"
+            aria-label="Close dialog"
+            @click="closeSuccessDialog"
+          >
+            ×
+          </button>
+        </div>
+
+        <a
+          :href="generatedUrl"
+          target="_blank"
+          rel="noreferrer"
+          class="mt-6 block break-all rounded-lg border border-emerald-200 bg-emerald-50 p-4 font-mono text-sm leading-6 text-emerald-700 transition hover:border-emerald-300 hover:text-emerald-800"
+        >
+          {{ generatedUrl }}
+        </a>
+
+        <div class="mt-5 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            class="inline-flex h-11 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
+            @click="copyLink"
+          >
+            {{ copied ? 'Copied' : 'Copy link' }}
+          </button>
+          <a
+            :href="generatedUrl"
+            target="_blank"
+            rel="noreferrer"
+            class="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-200"
+          >
+            Open page
+          </a>
+        </div>
+      </div>
+    </div>
   </main>
 </template>
